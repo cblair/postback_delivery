@@ -1,0 +1,23 @@
+front:
+  build: .
+  ports:
+    - "80:80"
+    - "443:443"
+    - "9000:9000"
+  links:
+    - redis:redis
+  volumes:
+    - ./www:/var/www
+    - ./src:/src
+    - ./sites:/etc/nginx/conf.d
+    - ./logs:/var/log/supervisor
+
+redis:
+  image: redis
+  ports:
+    - "6379:6379"
+  volumes:
+    - ./conf/redis.conf:/etc/redis/redis.conf
+  entrypoint:
+    - /usr/local/bin/redis-server
+    - /etc/redis/redis.conf
