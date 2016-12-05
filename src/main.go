@@ -9,7 +9,15 @@ import (
 	"errors"
 	"fmt"
 	"bytes"
+	"sync/atomic"
+	"time"
 )
+
+// responders is a count of how many responses are being made.
+var responders uint64 = 0
+// MAX_RESPONDERS is the maximum allowed of responses we'll do at one time for
+// postback.
+const MAX_RESPONDERS = 10000
 
 // Endpoint specifies postback information for what to postback to.
 type Endpoint struct {
@@ -34,6 +42,8 @@ func sendResponse(url string, method string, data []Datum) {
 	var resp *http.Response
 	var err error
 
+	atomic.AddUint64(&responders, 1)
+
 	for _, datum := range data {
 		if method != "GET" && method != "POST" {
 			err = errors.New("Postback method " + method + " was not GET or POST.")
@@ -55,6 +65,8 @@ func sendResponse(url string, method string, data []Datum) {
 			logger.Info(fmt.Sprintf("%T", resp))
 		}
 	}
+
+	atomic.AddUint64(&responders, ^uint64(0))
 }
 
 // main runs forever. If errors occur and it exits, this should be restarted
@@ -82,6 +94,15 @@ func main() {
 
 	// Main execution
 	for {
+		responders_now := atomic.LoadUint64(&responders)
+		logger.Info(fmt.Sprintf("Current responses in progress are %d", responders_now))
+		if responders_now > MAX_RESPONDERS {
+			logger.Error("responders exceed MAX_RESPONDERS, throttling.")
+			// Delay before checking again to let the responders catch up.
+			time.Sleep(1)
+			continue
+		}
+
 		// Grab postback data from the database in blocking mode with a
 		// timeout.
 		postback := client.BLPop(10, "data")

@@ -1,4 +1,6 @@
 <?php
+    // Ingest - a very simple consumer of Postback requests, putting those
+    // requests into a queue for consumption by other agents.
     define('MAX_QUEUE_SIZE', 100000);
 
     // Redis setup.
@@ -21,6 +23,8 @@
     if ($redis->lSize('data') <= MAX_QUEUE_SIZE) {
         $redis->lpush('data', $json);
     } else {
+        header('Retry-After: 10');
+        http_response_code(503);
         $response_json['error'] = 'MAX_QUEUE_SIZE ' . MAX_QUEUE_SIZE . ' reached';
     }
     echo json_encode($response_json);
